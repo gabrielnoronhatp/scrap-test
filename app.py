@@ -3,19 +3,7 @@ import base64
 import json
 
 def buscar_produtos(collection_id=None, category=None, specification_filters=None, from_index=0, to_index=15):
-    """
-    Função para buscar produtos com diferentes parâmetros
-    
-    Args:
-        collection_id (str): ID da coleção a ser consultada
-        category (str): ID da categoria a ser consultada
-        specification_filters (list): Lista de filtros de especificação
-        from_index (int): Índice inicial para paginação
-        to_index (int): Índice final para paginação
-    
-    Returns:
-        list: Lista de produtos encontrados com nome, preço e EAN
-    """
+  
     # URL do endpoint GraphQL
     url = "https://www.bemolfarma.com.br/_v/segment/graphql/v1"
     
@@ -54,7 +42,6 @@ def buscar_produtos(collection_id=None, category=None, specification_filters=Non
         }
     }
     
-    # Cabeçalhos adicionais para a requisição
     headers = {
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -69,10 +56,8 @@ def buscar_produtos(collection_id=None, category=None, specification_filters=Non
         try:
             response_data = response.json()
             
-            # Extrair os produtos da resposta
             data = response_data.get('data', {}).get('products', {})
             
-            # Verificar se 'data' contém uma lista de produtos ou um único produto
             if isinstance(data, list):
                 produtos = data
             else:
@@ -85,28 +70,24 @@ def buscar_produtos(collection_id=None, category=None, specification_filters=Non
                 else:
                     produto_info = produto
                 
-                # Extrair nome e preço
                 nome = produto_info.get('productName', produto_info.get('name', 'Nome não encontrado'))
                 
-                # Extrair preço - verificar diferentes estruturas possíveis
                 preco = None
                 if 'price' in produto_info and 'sellingPrice' in produto_info.get('price', {}):
                     preco = produto_info.get('price', {}).get('sellingPrice')
                 elif 'priceRange' in produto_info and 'sellingPrice' in produto_info.get('priceRange', {}):
                     preco = produto_info.get('priceRange', {}).get('sellingPrice', {}).get('lowPrice')
                 
-                # Extrair EAN - geralmente está dentro de 'items'
                 ean = 'EAN não encontrado'
                 items = produto_info.get('items', [])
                 if items and len(items) > 0:
                     ean = items[0].get('ean', 'EAN não encontrado')
                 
-                # Adicionar produto à lista de resultados
                 produtos_encontrados.append({
                     'nome': nome,
                     'preco': preco,
                     'ean': ean,
-                    'produto_completo': produto_info  # Opcional: armazenar dados completos
+                    'produto_completo': produto_info  
                 })
                 
                 # Imprimir informações (opcional)
