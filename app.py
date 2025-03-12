@@ -1,9 +1,11 @@
 import requests
-import base64
 import json
 
-def buscar_produtos(collection_id=None, category=None, specification_filters=None, from_index=0, to_index=15):
-  
+def buscar_produtos_paginados(pagina, produtos_por_pagina=100):
+    # Calcular os valores de `from` e `to`
+    from_index = (pagina - 1) * produtos_por_pagina
+    to_index = from_index + produtos_por_pagina - 1
+    
     # URL do endpoint GraphQL
     url = "https://www.bemolfarma.com.br/_v/segment/graphql/v1"
     
@@ -11,31 +13,42 @@ def buscar_produtos(collection_id=None, category=None, specification_filters=Non
     variables = {
         "hideUnavailableItems": True,
         "skusFilter": "ALL_AVAILABLE",
+        "simulationBehavior": "default",
         "installmentCriteria": "MAX_WITHOUT_INTEREST",
-        "category": category or "",
-        "collection": collection_id or "",
-        "specificationFilters": specification_filters or [],
-        "orderBy": "",
+        "productOriginVtex": False,
+        "map": "ft",
+        "query": "medicamentos",
+        "orderBy": "OrderByScoreDESC",
         "from": from_index,
         "to": to_index,
-        "shippingOptions": [],
-        "variant": "",
+        "selectedFacets": [
+            {
+                "key": "ft",
+                "value": "medicamentos"
+            }
+        ],
+        "fullText": "medicamentos",
+        "operator": "and",
+        "fuzzy": "0",
+        "searchState": None,
+        "facetsBehavior": "Static",
+        "categoryTreeBehavior": "default",
+        "withFacets": False,
         "advertisementOptions": {
-            "showSponsored": False,
-            "sponsoredCount": 2,
-            "repeatSponsoredProducts": False,
-            "advertisementPlacement": "home_shelf"
+            "showSponsored": True,
+            "sponsoredCount": 3,
+            "advertisementPlacement": "top_search",
+            "repeatSponsoredProducts": True
         }
     }
     
- 
     payload = {
-        "operationName": "Products",
+        "operationName": "productSearchV3",
         "variables": variables,
         "extensions": {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "21326beabc3e4114a48f876e981ac6f0c1561482d9ef2b773c08b8b57e2f83d6",
+                "sha256Hash": "9177ba6f883473505dc99fcf2b679a6e270af6320a157f0798b92efeab98d5d3",
                 "sender": "vtex.store-resources@0.x",
                 "provider": "vtex.search-graphql@0.x"
             }
@@ -56,38 +69,20 @@ def buscar_produtos(collection_id=None, category=None, specification_filters=Non
         try:
             response_data = response.json()
             
-            data = response_data.get('data', {}).get('products', {})
+            # Extrair os produtos da resposta
+            data = response_data.get('data', {}).get('productSearch', {}).get('products', [])
             
-            if isinstance(data, list):
-                produtos = data
-            else:
-                produtos = data.get('edges', [])
+            for produto in data:
+                # Extrair nome e preço
+                nome = produto.get('productName', 'Nome não encontrado')
+                preco = produto.get('priceRange', {}).get('sellingPrice', {}).get('highPrice', 'Preço não encontrado')
+                ean = produto.get('items', [{}])[0].get('ean', 'EAN não encontrado')
                 
-            for produto in produtos:
-                # Extrair o nó do produto se estiver em formato de edges
-                if 'node' in produto:
-                    produto_info = produto.get('node', {})
-                else:
-                    produto_info = produto
-                
-                nome = produto_info.get('productName', produto_info.get('name', 'Nome não encontrado'))
-                
-                preco = None
-                if 'price' in produto_info and 'sellingPrice' in produto_info.get('price', {}):
-                    preco = produto_info.get('price', {}).get('sellingPrice')
-                elif 'priceRange' in produto_info and 'sellingPrice' in produto_info.get('priceRange', {}):
-                    preco = produto_info.get('priceRange', {}).get('sellingPrice', {}).get('lowPrice')
-                
-                ean = 'EAN não encontrado'
-                items = produto_info.get('items', [])
-                if items and len(items) > 0:
-                    ean = items[0].get('ean', 'EAN não encontrado')
-                
+                # Adicionar produto à lista de resultados
                 produtos_encontrados.append({
                     'nome': nome,
                     'preco': preco,
-                    'ean': ean,
-                    'produto_completo': produto_info  
+                    'ean': ean
                 })
                 
                 # Imprimir informações (opcional)
@@ -103,20 +98,13 @@ def buscar_produtos(collection_id=None, category=None, specification_filters=Non
     
     return produtos_encontrados
 
-# Exemplo de uso para diferentes páginas/categorias
+# Exemplo de uso
 if __name__ == "__main__":
-    # Exemplo 1: Buscar produtos da coleção "Destaques da Semana" (ID 138)
-    print("=== DESTAQUES DA SEMANA ===")
-    destaques = buscar_produtos(collection_id="138", 
-                               specification_filters=["specificationFilter_Tarja do Medicamento:Venda Livre"])
-    
-    # Exemplo 2: Buscar produtos de uma categoria específica
-    print("\n=== CATEGORIA VITAMINAS ===")
-    vitaminas = buscar_produtos(category="131")  # Substitua pelo ID correto da categoria
-    
-    # Exemplo 3: Buscar produtos com filtros específicos
-    print("\n=== MEDICAMENTOS GENÉRICOS ===")
-    genericos = buscar_produtos(specification_filters=["specificationFilter_Tipo de Medicamento:Genérico"])
-    
-    
-    
+    total_paginas = 45  # Número total de páginas
+    produtos_por_pagina = 18  # Número de produtos por página, ajuste conforme necessário
+
+    for pagina in range(1, total_paginas + 1):
+        print(f"\n=== PÁGINA {pagina} ===")
+        produtos_pagina = buscar_produtos_paginados(pagina=pagina, produtos_por_pagina=produtos_por_pagina)
+        for produto in produtos_pagina:
+            print(f"Nome: {produto['nome']}, Preço: {produto['preco']}, EAN: {produto['ean']}")
